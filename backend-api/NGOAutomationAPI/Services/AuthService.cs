@@ -1,9 +1,12 @@
 ﻿
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using NGOAutomationAPI.Data;
 using NGOAutomationAPI.DTOs;
 using NGOAutomationAPI.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -12,12 +15,12 @@ namespace NGOAutomationAPI.Services
 	public class AuthService : IAuthService
 	{
 		private readonly AppDbContext _context;
-		private readonly IConfiguration _configuration;
+		private readonly IConfiguration _config;
 
         public AuthService(AppDbContext context, IConfiguration config)
 		{
             _context = context;
-            _configuration = config;
+			_config = config;
 		}
 
 		public async Task<string> Register(UserRegisterDto request)
@@ -45,6 +48,7 @@ namespace NGOAutomationAPI.Services
 		{
 			var user  = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
 			if (user == null || !VerifyPassword(request.Password, user.PasswordHash)) return "Invalid credentials";
+			return GenerateToken(user);
 		}
 
 		private void CreatePasswordHash(string password, out byte[] hash)
@@ -58,6 +62,25 @@ namespace NGOAutomationAPI.Services
 			using var sha256 = SHA256.Create();
 			var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
 			return Convert.ToBase64String(hash) == storedHash;
+		}
+
+		private string GenerateToken(User user)
+		{
+			var claims = new[]
+			{
+				new Claim(ClaimTypes.Name, user.Username),
+				new Claim(ClaimTypes.Role, user.Role)
+			};
+
+			var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT:Secret"]));
+			var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+			var token = new JwtSecurityToken(
+				claims: claims,
+				expires: DateTime.Now.AddDays(7),
+                signingCredentials: creds
+			);
+
+			return new JwtSecurityTokenHandler().WriteToken(token);
 		}
 	}
 }
