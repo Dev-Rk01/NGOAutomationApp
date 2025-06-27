@@ -72,7 +72,7 @@ namespace NGOAutomationAPI.Services
 				new Claim(ClaimTypes.Role, user.Role)
 			};
 
-			var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT:Secret"]));
+			var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT:Key"]));
 			var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 			var token = new JwtSecurityToken(
 				claims: claims,
